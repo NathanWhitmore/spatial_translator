@@ -1,0 +1,186 @@
+---
+title: "Spatial translator"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+    theme: spacelab
+    navbar:
+      - { title: "reproducible.co.nz", href: "https://reproducible.co.nz", align: right }
+    source_code: embed 
+    orientation: columns
+---
+<style>
+
+body {
+  padding-top: 70px;
+}
+
+
+.navbar-brand {
+font-family: "Candara";
+  font-weight: bold;
+  font-size: 24px;
+}
+
+
+</style>
+
+
+```{r}
+library(sf)
+library(flexdashboard)
+library(shiny)
+library(tidyverse)
+library(curl)
+library(lubridate)
+library(shinyFiles)
+library(DT)
+```
+
+Conversion
+=============================================
+
+
+Column {.sidebar data-width=250}
+-------------------------------------
+
+Select **From** then **To** then **Download**.
+
+*You can check the resultant table in the pane on the right*.
+
+
+
+
+
+<br/>
+
+```{r}
+# Input From 
+# Copy the line below to make a select box 
+  selectInput("from", label = HTML("<b>FROM</b>"), 
+    choices = c("csv", "gpx", "kml"), 
+    selected = "csv")
+```
+
+
+```{r, echo = FALSE}
+# from sequence
+
+renderUI({
+  
+  if (input$from == "gpx"){
+    
+    fileInput("file_from", "Choose gpx file",
+                    multiple = FALSE)
+    
+  } else if (input$from  == "csv"){
+  
+    fileInput("file_from", "Choose csv file",
+                    multiple = FALSE)
+  
+  } else {
+    
+    fileInput("file_from", "Choose kml File",
+                    multiple = FALSE)
+    
+  }
+  
+  
+})
+
+```
+
+```{r}
+dataset <- eventReactive(input$file_from,{
+  dataset <- st_read(input$file_from$datapath, quiet = TRUE)
+
+})
+```
+
+
+<br/>
+
+```{r}
+# Input To 
+# Copy the line below to make a select box 
+  selectInput("to", label = HTML("<b>TO</b>"), 
+    choices = c("csv", "gpx", "kml"), 
+    selected = "gpx")
+```
+
+
+
+
+<br/>
+
+```{r}
+# Create placeholder for the downloadButton
+uiOutput("downloadUI")
+```
+
+```{r, echo = FALSE}
+output$downloadUI <- renderUI( {
+  downloadButton("downBtn", "Download csv data", style = "width:100%;")
+})
+
+output$downBtn <- downloadHandler(
+  filename = function() {paste0("Name your file",".", input$to)},
+  content = function(file) {
+    
+    write.csv(final(), file, row.names = FALSE)
+  }
+)
+```
+
+
+
+Column 
+-------------------------------------
+
+
+```{r}
+final <- reactive({
+  
+  if(input$from == "gpx"){
+    dataset <- dataset()
+      
+    coord <- st_coordinates(dataset)
+    st_geometry(dataset) <- NULL
+      
+    q1 <- cbind(dataset, coord) %>% as.data.frame()
+    
+    q1 <- q1 %>% rename (latitude = X,
+                  longitude = Y)
+    q1
+    
+  } else {
+    
+    dataset <- dataset()
+      
+    coord <- st_coordinates(dataset)
+    st_geometry(dataset) <- NULL
+      
+    q1 <- cbind(dataset, coord) %>% as.data.frame()
+    
+    q1 <- q1 %>% rename (latitude = X,
+                  longitude = Y)
+    
+  }
+  
+    
+})
+```
+
+```{r}
+renderTable({
+  
+  final()
+  
+
+  
+})
+```
+
+Vidoe help
+=============================================
