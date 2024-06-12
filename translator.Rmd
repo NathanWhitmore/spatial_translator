@@ -57,14 +57,16 @@ Select **From** then **To** then **Download**.
 # Input From 
 # Copy the line below to make a select box 
   selectInput("from", label = HTML("<b>FROM</b>"), 
-    choices = c("csv", "gpx", "kml"), 
-    selected = "gpx")
+    choices = c("csv", "gpx", "kml", "shp (zipped)")
+    )
 ```
 
 
 
 ```{r}
 dataset <- eventReactive(input$file_from,{
+  
+
   dataset <- st_read(input$file_from$datapath, quiet = TRUE)
 
 })
@@ -75,10 +77,18 @@ dataset <- eventReactive(input$file_from,{
 
 ```{r}
 # Input To 
+
+renderUI({
 # Copy the line below to make a select box 
+  
+  old.choices <-  c("csv", "gpx", "kml", "shp (zipped)")
+  new.choices <- old.choices[old.choices != input$from]
+  
   selectInput("to", label = HTML("<b>TO</b>"), 
-    choices = c("csv", "gpx", "kml"), 
-    selected = "csv")
+    choices = new.choices)
+  
+  
+})
 ```
 
 <br/>
@@ -96,6 +106,11 @@ renderUI({
   } else if (input$from  == "csv"){
   
     fileInput("file_from", "Choose csv file",
+                    multiple = FALSE)
+  
+  } else if (input$from  == "shp (zipped)"){
+  
+    fileInput("file_from", "Choose shp files (zipped)",
                     multiple = FALSE)
   
   } else {
