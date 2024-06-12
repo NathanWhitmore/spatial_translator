@@ -43,7 +43,7 @@ Conversion
 =============================================
 
 
-Column {.sidebar data-width=250}
+Column {.sidebar data-width=300}
 -------------------------------------
 
 Select **From** then **To** then **Download**.
@@ -113,13 +113,28 @@ renderUI({
 <br/>
 
 
+```{r}
+renderUI({
+  if (input$from == "csv") {
+    # latitude
+    numericInput("input.crs",
+                label = HTML("<b>Input coordinate ref system (epsg)</b><br/>longlat is default (4326)"),
+                value = 4326)
+    
+  }
+  
+})
+```
+
+<br/>
+
 
 ```{r}
 renderUI({
   if (input$from == "csv") {
     # latitude
     selectInput("longitude",
-                label = "Select longitude column",
+                label = HTML("<b>Select longitude column</b>"),
                 choices = sort(unique(names(dataset(
                 )))))
     
@@ -137,7 +152,7 @@ renderUI({
   if (input$from == "csv") {
     # latitude
     selectInput("latitude",
-                label = "Select latitude column",
+                label = HTML("<b>Select latitude column</b>"),
                 choices = sort(unique(names(dataset(
                 )))))
   }
@@ -145,7 +160,19 @@ renderUI({
 })
 ```
 
+<br/>
 
+```{r}
+# Output CRS
+numericInput(
+  "output.crs",
+  label = HTML(
+    "<b>Output coordinate ref system (epsg)</b><br/>longlat is default (4326)"
+  ),
+  value = 4326
+)
+
+```
 
 <br/>
 
@@ -160,15 +187,25 @@ output$downloadUI <- renderUI( {
 })
 
 output$downBtn <- downloadHandler(
-   filename = function() {'Name your by taxonomy file.kml'},
+   filename = function() {paste0("Name your file.", input$to)},
+   
   content = function(file) {
-    st_write(final(), file)
+    
+    if(input$to == "gpx"){
+      
+      st_write(final(), file, driver ="GPX", waypoints = TRUE,  dataset_options = "GPX_USE_EXTENSIONS=YES")
+      
+    } else {
+      
+      st_write(final(), file)
+      
+      }
+    
+    
+    
   }
 )
     
-
-
-
 ```
 
 
@@ -217,12 +254,14 @@ final <- reactive({
     
     spatial <- st_as_sf(dataset,
                         coords = c(input$longitude, input$latitude), 
-                        crs = 4326)
+                        crs = input$input.crs)
       
     spatial
     
   } else {
     
+     dataset <- dataset()
+     dataset
     
 }
   
@@ -236,7 +275,6 @@ renderPrint({
   final()
   
 
-  
 })
 ```
 
