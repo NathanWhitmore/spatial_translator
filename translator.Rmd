@@ -258,7 +258,7 @@ output$downloadUI <- renderUI( {
       file.copy(name.zip, file)
         
       # remove all the files created
-      #file.remove(zip_file, shp_files)
+      if (length(Sys.glob(name.glob)) > 0) file.remove(Sys.glob(name.glob))
       
       
       } else {
@@ -342,43 +342,18 @@ renderPrint({
 ```
 
 
-Test
-=============================================
-
-```{r}
-renderPrint({
-  
-  if (input$to == "shp (zipped)") {
-  
-   # Create a temporary file path for the shapefile (note: multiple files are created for a shapefile)
-      unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
-    
-      temp_dir <-  tempdir()
-      
-      name.base <- file.path(temp_dir, "Name this file")
-      name.glob <- paste0(name.base, ".*")
-      name.shp  <- paste0(name.base, ".shp")
-      name.zip  <- paste0(name.base, ".zip")
-      
-      st_write(final(), dsn = name.shp,  driver = "ESRI Shapefile")
-      
-      #if (length(Sys.glob(name.glob)) > 0) file.remove(Sys.glob(name.glob))
-      
-      zipr(zipfile = name.zip, files = Sys.glob(name.glob))
-      
-      list.files(temp_dir)
-       
-       
-  
-  }
-  
- 
-  
-  
-})
-```
-
-
 
 Video help
 =============================================
+
+
+Column {.sidebar data-width=300}
+-------------------------------------
+
+Video instructions are on the right
+
+
+Column 
+-------------------------------------
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/458eeac98beb438aa67c54405e4b671b?sid=d41c25f2-04be-4211-901d-6e4924ba1bca" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 80%; height: 80%;"></iframe></div>
