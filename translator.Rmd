@@ -37,6 +37,7 @@ library(curl)
 library(lubridate)
 library(shinyFiles)
 library(DT)
+library(zip)
 ```
 
 Conversion
@@ -62,12 +63,31 @@ Select **From** then **To** then **Download**.
 ```
 
 
-
 ```{r}
 dataset <- eventReactive(input$file_from,{
   
-
+  if(input$from != "shp (zipped)"){
+    
   dataset <- st_read(input$file_from$datapath, quiet = TRUE)
+  dataset
+  
+  } else {
+    
+  # Create temp files
+  zipped <- input$file_from$datapath
+  unzipped <- tempfile()
+  
+  # Unzip the contents of the temp and save unzipped content in 'temp2'
+  unzip(zipfile = zipped, exdir = unzipped)
+
+  # Define the shapefile path
+  shapefile_path <- file.path(unzipped)
+  
+  dataset <- st_read(shapefile_path, quiet = TRUE)
+  dataset
+  
+  }
+    
 
 })
 ```
@@ -201,25 +221,53 @@ output$downloadUI <- renderUI( {
   downloadButton("downBtn", "Download data", style = "width:100%;")
 })
 
-output$downBtn <- downloadHandler(
-   filename = function() {paste0("Name your file.", input$to)},
-   
-  content = function(file) {
-    
-    if(input$to == "gpx"){
+ output$downBtn <- downloadHandler(
+    filename = function() {
+      paste0("Name_your_file.",
+             if (input$to != "shp (zipped)") {
+               input$to
+             } else {
+               "zip"
+             }
+      )
+    },
+    content = function(file) {
+      if (input$to == "gpx") {
+        st_write(final(), file, driver = "GPX", waypoints = TRUE, dataset_options = "GPX_USE_EXTENSIONS=YES")
+        
+    } else if (input$to == "shp (zipped)" ) {
       
-      st_write(final(), file, driver ="GPX", waypoints = TRUE,  dataset_options = "GPX_USE_EXTENSIONS=YES")
+      unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
       
-    } else {
+      temp_dir <-  tempdir()
       
-      st_write(final(), file)
+      name.base <- file.path(temp_dir, "Name this file")
+      name.glob <- paste0(name.base, ".*")
+      name.shp  <- paste0(name.base, ".shp")
+      name.zip  <- paste0(name.base, ".zip")
       
+      st_write(final(), dsn = name.shp,  driver = "ESRI Shapefile")
+      
+      #if (length(Sys.glob(name.glob)) > 0) file.remove(Sys.glob(name.glob))
+      
+      zipr(zipfile = name.zip, files = Sys.glob(name.glob))
+      
+      #if (length(Sys.glob(name.glob)) > 0) file.remove(Sys.glob(name.glob))
+      
+      # copy the zip file to the file argument
+      file.copy(name.zip, file)
+        
+      # remove all the files created
+      #file.remove(zip_file, shp_files)
+      
+      
+      } else {
+        st_write(final(), file)
       }
-    
-    
-    
-  }
-)
+    }
+  )
+  
+
     
 ```
 
@@ -231,7 +279,6 @@ Column {.tabset}
 
 ```{r}
 renderPrint({
-  
   
   print(dataset())
   
@@ -248,7 +295,7 @@ final <- reactive({
   
   if(input$to == "csv"){
     
-    dataset <- dataset()
+    dataset <- dataset() %>% st_transform(crs = input$output.crs)
       
     coord <- st_coordinates(dataset)
     st_geometry(dataset) <- NULL
@@ -264,18 +311,19 @@ final <- reactive({
     
   } else if (input$from == "csv") {
     
-    dataset <- dataset()
+    dataset <- dataset() 
     
     
     spatial <- st_as_sf(dataset,
                         coords = c(input$longitude, input$latitude), 
-                        crs = input$input.crs)
-      
-    spatial
+                        crs = input$input.crs) %>% 
+      st_transform(crs = input$output.crs)
+    
+    spatial 
     
   } else {
     
-     dataset <- dataset()
+     dataset <- dataset() %>% st_transform(crs = input$output.crs)
      dataset
     
 }
@@ -292,6 +340,45 @@ renderPrint({
 
 })
 ```
+
+
+Test
+=============================================
+
+```{r}
+renderPrint({
+  
+  if (input$to == "shp (zipped)") {
+  
+   # Create a temporary file path for the shapefile (note: multiple files are created for a shapefile)
+      unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
+    
+      temp_dir <-  tempdir()
+      
+      name.base <- file.path(temp_dir, "Name this file")
+      name.glob <- paste0(name.base, ".*")
+      name.shp  <- paste0(name.base, ".shp")
+      name.zip  <- paste0(name.base, ".zip")
+      
+      st_write(final(), dsn = name.shp,  driver = "ESRI Shapefile")
+      
+      #if (length(Sys.glob(name.glob)) > 0) file.remove(Sys.glob(name.glob))
+      
+      zipr(zipfile = name.zip, files = Sys.glob(name.glob))
+      
+      list.files(temp_dir)
+       
+       
+  
+  }
+  
+ 
+  
+  
+})
+```
+
+
 
 Video help
 =============================================
