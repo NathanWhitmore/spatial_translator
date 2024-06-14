@@ -44,19 +44,15 @@ Conversion
 =============================================
 
 
-Column {.sidebar data-width=300}
+Column {.sidebar data-width=380}
 -------------------------------------
 
-Select **From** then **To** then **Download**.
-
-*You can check the resultant output in the pane on the right*.
-
+Select transformation with **From** & **To**. Upload file. Fill and check widgets. Click **Update** when happy. Check input and output then **Download**.
 
 <br/>
 
 ```{r}
 # Input From 
-# Copy the line below to make a select box 
   selectInput("from", label = HTML("<b>FROM</b>"), 
     choices = c("csv", "gpx", "kml", "shp (zipped)")
     )
@@ -64,6 +60,7 @@ Select **From** then **To** then **Download**.
 
 
 ```{r}
+# read files; somewhat complex for shapefiles
 dataset <- eventReactive(input$file_from,{
   
   if(input$from != "shp (zipped)"){
@@ -96,10 +93,9 @@ dataset <- eventReactive(input$file_from,{
 <br/>
 
 ```{r}
-# Input To 
 
+# Input To
 renderUI({
-# Copy the line below to make a select box 
   
   old.choices <-  c("csv", "gpx", "kml", "shp (zipped)")
   new.choices <- old.choices[old.choices != input$from]
@@ -114,28 +110,28 @@ renderUI({
 <br/>
 
 ```{r, echo = FALSE}
-# from sequence
+# reactive upload widget
 
 renderUI({
   
   if (input$from == "gpx"){
     
-    fileInput("file_from", "Choose gpx file",
+    fileInput("file_from", HTML("<b>Choose gpx file</b>"),
                     multiple = FALSE)
     
   } else if (input$from  == "csv"){
   
-    fileInput("file_from", "Choose csv file",
+    fileInput("file_from", HTML("<b>Choose csv file</b> <br/>(missing coords will be dropped)"),
                     multiple = FALSE)
   
   } else if (input$from  == "shp (zipped)"){
   
-    fileInput("file_from", "Choose shp files (zipped)",
+    fileInput("file_from", HTML("<b>Choose shp files (zipped)</b>"),
                     multiple = FALSE)
   
   } else {
     
-    fileInput("file_from", "Choose kml File",
+    fileInput("file_from", HTML("<b>Choose kml file</b>"),
                     multiple = FALSE)
     
   }
@@ -148,7 +144,9 @@ renderUI({
 <br/>
 
 
+
 ```{r}
+# input CRS for csv only
 renderUI({
   if (input$from == "csv") {
     # latitude
@@ -165,6 +163,7 @@ renderUI({
 
 
 ```{r}
+# select longitude column (from csv only)
 renderUI({
   if (input$from == "csv") {
     # latitude
@@ -181,7 +180,7 @@ renderUI({
 <br/>
 
 ```{r}
-# latitude
+# select latitude column (from csv only)
 
 renderUI({
   if (input$from == "csv") {
@@ -198,7 +197,7 @@ renderUI({
 <br/>
 
 ```{r}
-# Output CRS
+# Output CRS widget
 numericInput(
   "output.crs",
   label = HTML(
@@ -212,11 +211,20 @@ numericInput(
 <br/>
 
 ```{r}
+# update button
+actionButton("update", "Click to update", class = "btn-warning")
+```
+
+<br/>
+
+```{r}
 # Create placeholder for the downloadButton
 uiOutput("downloadUI")
 ```
 
 ```{r, echo = FALSE}
+# download handler
+# note that gpx and shp formats require special handling
 output$downloadUI <- renderUI( {
   downloadButton("downBtn", "Download data", style = "width:100%;")
 })
@@ -237,23 +245,24 @@ output$downloadUI <- renderUI( {
         
     } else if (input$to == "shp (zipped)" ) {
       
+      # clear temporary files
       unlink(paste0(normalizePath(tempdir()), "/", dir(tempdir())), recursive = TRUE)
       
+      # create temporary directory
       temp_dir <-  tempdir()
       
+      # make paths
       name.base <- file.path(temp_dir, "Name this file")
       name.glob <- paste0(name.base, ".*")
       name.shp  <- paste0(name.base, ".shp")
       name.zip  <- paste0(name.base, ".zip")
       
+      # write to sf
       st_write(final(), dsn = name.shp,  driver = "ESRI Shapefile")
       
-      #if (length(Sys.glob(name.glob)) > 0) file.remove(Sys.glob(name.glob))
-      
+      # zip file
       zipr(zipfile = name.zip, files = Sys.glob(name.glob))
-      
-      #if (length(Sys.glob(name.glob)) > 0) file.remove(Sys.glob(name.glob))
-      
+    
       # copy the zip file to the file argument
       file.copy(name.zip, file)
         
@@ -271,17 +280,46 @@ output$downloadUI <- renderUI( {
     
 ```
 
-
+<br/>
+<br/>
 
 Column {.tabset}
 -------------------------------------
 ### Input
 
 ```{r}
+# show input metadata
+
+their.input <- eventReactive(input$update, {
+  
+  
+  if(input$from != "csv"){
+  my.list <- list(Format_from = input$from,
+                  Format_to = input$to,
+                  CRS = dataset() %>% st_crs(),
+                  Extent = dataset() %>% st_bbox(),
+                  Variables = names(dataset())
+  )
+  
+  } else {
+    
+  my.list <- list(Format_from = input$from,
+                  Format_to = input$to,
+                  Longitude = input$longitude,
+                  Latitude = input$latitude,
+                  Variables = names(dataset())
+  )
+    
+  }
+  
+  print(my.list)
+  
+})
+
+
 renderPrint({
   
-  print(dataset())
-  
+  their.input()
 })
 ```
 
@@ -291,11 +329,18 @@ renderPrint({
 ### Output
 
 ```{r}
+
+
 final <- reactive({
   
   if(input$to == "csv"){
     
     dataset <- dataset() %>% st_transform(crs = input$output.crs)
+    
+     # get CRS code
+    # Get the CRS information
+    crs_info <- st_crs(dataset)
+    
       
     coord <- st_coordinates(dataset)
     st_geometry(dataset) <- NULL
@@ -303,17 +348,27 @@ final <- reactive({
     df <- cbind(dataset, coord) %>% as.data.frame()
     
     # as coord as X and Y we must rename
-    
     df <- df %>% rename (latitude =Y,
                   longitude = X)
     
+    # move to first columns for easy reading
     df %>% relocate(latitude) %>% relocate(longitude)
+    
+    # record CRS info as espg number
+    df$CRS.epsg <- crs_info$epsg
+    
+    df
     
   } else if (input$from == "csv") {
     
-    dataset <- dataset() 
+    dataset <- dataset()
     
+    # drop if NA note use of base R alternate
+    dataset <- dataset[dataset[,input$longitude] != "",]
+    dataset <- dataset[dataset[,input$latitude] != "",]
+   
     
+    # change to sf
     spatial <- st_as_sf(dataset,
                         coords = c(input$longitude, input$latitude), 
                         crs = input$input.crs) %>% 
@@ -333,27 +388,77 @@ final <- reactive({
 ```
 
 ```{r}
-renderPrint({
+# show output metadata
+
+their.output <- eventReactive(input$update, {
   
-  final()
+   
+  if(input$to != "csv"){
+  my.list <- list(Format_from = input$from,
+                  Format_to = input$to,
+                  CRS = final() %>% st_crs(),
+                  Extent = final() %>% st_bbox(),
+                  Variables = names(final())
+  )
+  
+  } else {
+    
+  my.list <- list(Format_from = input$from,
+                  Format_to = input$to,
+                  CRS = input$output.crs,
+                  Longitude = input$longitude,
+                  Latitude = input$latitude,
+                  Variables = names(final())
+  )
+    
+  }
+  
+  print(my.list)
   
 
+})
+
+renderPrint({
+  
+  their.output()
+  
 })
 ```
 
 
 
-Video help
+
+
+Help & videos
 =============================================
 
 
-Column {.sidebar data-width=300}
+Column {.sidebar data-width=350}
 -------------------------------------
 
-Video instructions are on the right
+**Coordinate reference systems**
+
+A searchable registry of the epsg coordinate reference system can be found [here](https://epsg.io/).
+
+<br/>
+
+**References**
+
+The spatial transformations used in this dashboard were implemented using the ['sf' package](https://cran.r-project.org/web/packages/sf/): 
+
+*Edzer Pebesma and Roger Bivand and Sebastian Luque (2023). Spatial Data Science: With Applications in R. Chapman and Hall. CRC Press.*
+
+
+<br/>
+
+**Acknowledgements**
+
+The code for this dashboard was written by Nathan Whitmore is freely available for reuse and modification via an [MIT license](https://choosealicense.com/licenses/mit/). The source code can be found under the under the '</> Source Code' tab or via [GitHub](https://github.com/NathanWhitmore/spatial_translator). 
+
+Dashboard creation was funded by the Otago Regional Council. Special thanks go to Scott Jarvie for instigating this project.
 
 
 Column 
 -------------------------------------
 
-<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/458eeac98beb438aa67c54405e4b671b?sid=d41c25f2-04be-4211-901d-6e4924ba1bca" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 80%; height: 80%;"></iframe></div>
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/fadfc39e7835425da1b3640a0cc47a5b?sid=3c7d95f7-d70f-4ba2-acf7-b09ed842776d" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 80%; height: 80%;"></iframe></div>
