@@ -461,4 +461,6 @@ Dashboard creation was funded by the Otago Regional Council. Special thanks go t
 Column 
 -------------------------------------
 
+### Help video
+
 <div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/fadfc39e7835425da1b3640a0cc47a5b?sid=3c7d95f7-d70f-4ba2-acf7-b09ed842776d" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 80%; height: 80%;"></iframe></div>
